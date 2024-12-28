@@ -1,57 +1,51 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
+import { Search, Plane } from 'lucide-react';
 
 const FlightSearch = () => {
+  const initialDate = format(new Date(), 'dd MMM, yyyy');
   const [searchParams, setSearchParams] = useState({
     from: '',
     to: '',
-    start: '',
-    end: '',
-    isRoundTrip: false
+    whenDate: initialDate,
+    isRoundTrip: false,
+    returnDepartureDateTimeRange: null
   });
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleDateChange = (e) => {
+    const inputDate = new Date(e.target.value);
+    const formattedDate = format(inputDate, 'dd MMM, yyyy');
+    setSearchParams({ ...searchParams, whenDate: formattedDate });
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-
+    setError('');
+    
     try {
-      // Format dates to YYYY-MM-DD
-      const formattedParams = {
-        ...searchParams,
-        from: searchParams.from.toUpperCase(),
-        to: searchParams.to.toUpperCase(),
-        start: searchParams.start,
-        end: searchParams.isRoundTrip ? searchParams.end : searchParams.start
-      };
-
-      const response = await axios.post('http://localhost:5000/api/flights/search', formattedParams);
-      setFlights(response.data);
-    } catch (err) {
-      console.error('Search error:', err);
-      setError(err.response?.data?.message || 'Failed to search flights. Please try again.');
+      const response = await fetch('http://localhost:5000/api/flights/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchParams),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch flights');
+      }
+      
+      const data = await response.json();
+      setFlights(data);
+    } catch (error) {
+      setError('Error searching flights. Please try again.');
+      console.error('Error:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setSearchParams(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const formatFlightDate = (dateString) => {
-    try {
-      return format(new Date(dateString), 'MMM d, yyyy h:mm a');
-    } catch (err) {
-      return 'Invalid Date';
     }
   };
 
@@ -61,161 +55,142 @@ const FlightSearch = () => {
     return `${hours}h ${mins}m`;
   };
 
+  const formatDateTime = (dateString) => {
+    return format(new Date(dateString), 'dd MMM, yyyy HH:mm');
+  };
+
+  // Convert date string to HTML date input format
+  const getHtmlDateFormat = (dateString) => {
+    const parsedDate = parse(dateString, 'dd MMM, yyyy', new Date());
+    return format(parsedDate, 'yyyy-MM-dd');
+  };
+
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Flight Search</h2>
-        
-        <form onSubmit={handleSearch} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="from" className="block text-sm font-medium text-gray-700">From</label>
-              <input
-                id="from"
-                type="text"
-                name="from"
-                placeholder="Airport code (e.g., DUB)"
-                value={searchParams.from}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase"
-                required
-                maxLength="3"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="to" className="block text-sm font-medium text-gray-700">To</label>
-              <input
-                id="to"
-                type="text"
-                name="to"
-                placeholder="Airport code (e.g., SYD)"
-                value={searchParams.to}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase"
-                required
-                maxLength="3"
-              />
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h1 className="text-3xl font-bold mb-6 text-gray-800">Flight Search</h1>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="start" className="block text-sm font-medium text-gray-700">Departure Date</label>
-              <input
-                id="start"
-                type="date"
-                name="start"
-                value={searchParams.start}
-                onChange={handleInputChange}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                required
-              />
+          <form onSubmit={handleSearch} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">From</label>
+                <input
+                  type="text"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="City or Airport Code"
+                  value={searchParams.from}
+                  onChange={(e) => setSearchParams({...searchParams, from: e.target.value.toUpperCase()})}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">To</label>
+                <input
+                  type="text"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="City or Airport Code"
+                  value={searchParams.to}
+                  onChange={(e) => setSearchParams({...searchParams, to: e.target.value.toUpperCase()})}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Date</label>
+                <input
+                  type="date"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={getHtmlDateFormat(searchParams.whenDate)}
+                  onChange={handleDateChange}
+                  required
+                />
+                <div className="text-sm text-gray-500">{searchParams.whenDate}</div>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <label className="flex items-center space-x-2 cursor-pointer">
+            
+            <div className="flex items-center justify-between">
+              <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  name="isRoundTrip"
                   checked={searchParams.isRoundTrip}
-                  onChange={handleInputChange}
-                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  onChange={(e) => setSearchParams({...searchParams, isRoundTrip: e.target.checked})}
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-gray-700">Round Trip</span>
+                <span className="text-sm text-gray-700">Round Trip</span>
               </label>
+              
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 flex items-center space-x-2 disabled:opacity-50"
+                disabled={loading}
+              >
+                <Search size={20} />
+                <span>{loading ? 'Searching...' : 'Search Flights'}</span>
+              </button>
             </div>
-          </div>
-
-          {searchParams.isRoundTrip && (
-            <div className="space-y-2">
-              <label htmlFor="end" className="block text-sm font-medium text-gray-700">Return Date</label>
-              <input
-                id="end"
-                type="date"
-                name="end"
-                value={searchParams.end}
-                onChange={handleInputChange}
-                min={searchParams.start}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                required
-              />
+          </form>
+          
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
+              {error}
             </div>
           )}
+        </div>
 
-          <button 
-            type="submit" 
-            className={`w-full py-3 px-4 rounded-lg text-white font-medium transition-colors
-              ${loading 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700'}`}
-            disabled={loading}
-          >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <span className="mr-2">Searching</span>
-                <span className="animate-pulse">...</span>
-              </div>
-            ) : (
-              'Search Flights'
-            )}
-          </button>
-        </form>
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {flights.length > 0 ? (
-          <div className="mt-8 space-y-4">
-            {flights.map((flight) => (
-              <div 
-                key={flight.id} 
-                className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow"
-              >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="space-y-3 flex-1">
-                    <div className="flex items-center space-x-4">
-                      <div className="text-center">
-                        <p className="font-bold text-lg">{flight.cityFrom}</p>
-                        <p className="text-sm text-gray-600">{flight.flyFrom}</p>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                        <span className="text-xs text-gray-500">
-                          {formatDuration(flight.duration.departure)}
-                        </span>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-bold text-lg">{flight.cityTo}</p>
-                        <p className="text-sm text-gray-600">{flight.flyTo}</p>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <p>Departure: {formatFlightDate(flight.local_departure)}</p>
-                      <p>Arrival: {formatFlightDate(flight.local_arrival)}</p>
-                    </div>
+        <div className="space-y-6">
+          {flights.map((flight) => (
+            <div key={flight.id} className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div className="flex items-center space-x-8">
+                  <div className="flex flex-col">
+                    <span className="text-3xl font-bold">{flight.flyFrom}</span>
+                    <span className="text-sm text-gray-500">{flight.cityFrom}</span>
                   </div>
-                  <div className="md:text-right space-y-2">
-                    <p className="text-3xl font-bold text-blue-600">
-                      ${flight.price}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Operated by: {flight.airlines.join(', ')}
-                    </p>
+                  <Plane className="text-blue-600 h-8 w-8" />
+                  <div className="flex flex-col">
+                    <span className="text-3xl font-bold">{flight.flyTo}</span>
+                    <span className="text-sm text-gray-500">{flight.cityTo}</span>
+                  </div>
+                </div>
+                <div className="mt-4 md:mt-0 text-right">
+                  <div className="text-3xl font-bold text-blue-600">
+                    ${flight.price}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    €{flight.conversion.EUR.toFixed(2)}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : !loading && (
-          <div className="mt-8 text-center text-gray-500">
-            No flights found. Try different search criteria.
-          </div>
-        )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm">
+                <div>
+                  <div className="font-medium text-gray-500">Departure</div>
+                  <div className="mt-1">{formatDateTime(flight.local_departure)}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-500">Arrival</div>
+                  <div className="mt-1">{formatDateTime(flight.local_arrival)}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-500">Duration</div>
+                  <div className="mt-1">{formatDuration(flight.duration.total / 60)}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-500">Available Seats</div>
+                  <div className="mt-1">{flight.availability.seats}</div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t">
+                <div className="text-sm text-gray-500">
+                  Airlines: {flight.airlines.join(', ')}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
